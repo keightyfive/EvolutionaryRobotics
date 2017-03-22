@@ -1,0 +1,7 @@
+#VRML_OBJ V8.3.2 utf8
+DEF ROBOT E-puck {
+  translation 0 0.5 0
+  rotation 0 1 0 1.57
+  controller "rnn_controller"
+  name "ROBOT"
+}

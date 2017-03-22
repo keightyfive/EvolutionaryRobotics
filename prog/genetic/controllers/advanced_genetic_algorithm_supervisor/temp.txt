@@ -1,0 +1,166 @@
+
+bool isBackwardRecurrent=true;
+bool isSelfRecurrent=true;
+
+double fast_sigmoid(double x){
+	return x/(1+abs(x));
+}
+
+struct _neuron_{
+	int forward_InputNum;
+	int backward_InputNum;
+	double cur_val;
+	double new_val;
+	double self_weight;
+	double* fVec;
+	double* bVec;	
+}
+
+Neuron new_neuron(int finput, int binput){
+    Neuron n=malloc(sizeof(struct _neuron_));
+	n->forward_InputNum=finput;
+	n->backward_InputNum=binput;
+	n->cur_val=0;
+	n->new_val=0;
+	//weight for self connection
+	n->self_weight=0;
+	n->fVec=(double*)malloc(finput*sizeof(double));
+	n->bVec=(double*)malloc(finput*sizeof(double));
+	return n;
+}
+
+double eval_neuron(Neuron n){
+	int i;
+	double sum=0;
+	for (i=0;i<n->forward_InputNum;i++){
+		sum+=n->fVec[i];
+	}
+	for (i=0;i<n->backward_InputNum;i++){
+		sum+=n->bVec[i];
+	}
+	if (isSelfRecurrent){
+		sum+=n->cur_val*n->self_weight;
+	}
+	//activation function
+	sum=fast_sigmoid(sum);
+	n->new_val=sum;
+	return sum;
+}
+
+void destroy_neuron(Neuron n){
+	free(n->fVec);
+	free(n->bVec);
+	free(n);
+}
+
+struct _neuron_layer_ {
+	int neuron_num;
+	Neuron* neurons;
+	
+}
+
+NeuronLayer new_layer(int neuron_num, int finput, int binput){
+	NeuronLayer nl=malloc(sizeof(struct _neuron_layer_));
+	nl->neuron_num=neuron_num;
+	nl->neurons=(Neuron*)malloc(sizeof(Neuron)*neuron_num);
+	int i;
+	for (i=0;i<neuron_num;i++){
+		nl->neurons[i]=new_neuron(finput,binput);
+	}
+	return nl;
+}
+
+void destroy_layer(NeuronLayer nl){
+	int i;
+	for (i=0;i<nl->neuron_num;i++){
+		destroy_neuron(nl->neurons[i]);
+	}
+	free(nl);
+}
+
+struct _neural_net {
+	int layer_num;
+	int input_num;
+	int output_num;
+	NeuronLayer* layers;
+}
+
+NeuralNet new_net(int input_num, int output_num; int hidden_layer_num, int hidden_layer_neuron_num){
+	NeuralNet nn=malloc(sizeof(struct _neural_net_));
+	nn->input_num=input_num;
+	nn->output_num=output_num;
+	//input+hidden+output
+	nn->layer_num=2+hidden_layer_num;
+	nn->layers=(NeuronLayer*)malloc(nn->layer_num*sizeof(NeuronLayer));
+	//create input layer
+	int binput_firstlayer;
+	if (isBackwardRecurrent){
+		binput_firstlayer=hidden_layer_neuron_num;
+	}else{
+		binput_firstlayer=0;
+	}
+	nn->layers[0]=new_layer(input_num, 0, binput_firstlayer);
+	//create output layer
+	nn->layers[nn->layer_num-1]=new_layer(output_num, hidden_layer_neuron_num, 0);
+	int i;
+	//create hiddenlayers
+	for (i=1;i< nn->layer_num-1;i++){
+		int finput=nn->layers[i-1]->neuron_num;
+		int binput;
+		if (i< nn->layer_num-2) {
+			binput=hidden_layer_neuron_num;
+		}else{
+			binput=output_num;
+		}
+		if (!isBackwardRecurrent){
+			binput=0;
+		}
+		
+		nn->layers[i]=new_layer(hidden_layer_neuron_num, finput, binput);
+	}
+	return nn;
+}
+
+void destroy_net(NeuralNet nn){
+	int i;
+	for (i=0;i< nn->layer_num;i++){
+		destroy_layer(nn->layers[i]);
+	}
+	free(nn);
+}
+
+double* evaluate_net(double* inputs, Neuralnet nn){
+	//layer index
+	int li;
+	//neuron index at each layer
+	int ni;
+	
+	double result[nn->output_num];
+	//calculate value of each neuron for current time step from last step
+	for (li=0; li<nn->layer_num; li++){
+		if (li==0){
+			//set input 
+			for(ni=0;ni<nn->layers[li]->neuron_num;i++){
+				nn->layers[li]->neurons[ni]->cur_val=inputs[ni];
+				nn->layers[li]->neurons[ni]->new_val=inputs[ni];
+			}
+		}else{
+			for(ni=0;ni<nn->layers[li]->neuron_num;i++){
+				double val=eval_neuron(nn->layers[li]->neurons[ni]);
+				if (li==nn->layer_num-1){
+					//if already the last layer, take the value for output 
+					result[ni]=val;
+				}
+			}
+		}
+	}
+	//update neuron value with the new value
+	for (li=0;li<nn->layer_num;li++){
+		for (ni=0;ni<nn->layers[li]->neuron_num;i++){
+			Neuron n=nn->layers[li]->neurons[ni];
+			n->cur_val=n->new_val;
+		}
+	}
+	return result;
+}
+
